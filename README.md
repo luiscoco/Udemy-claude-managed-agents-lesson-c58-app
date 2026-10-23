@@ -42,26 +42,76 @@ CLAUDE_MANAGED_ENVIRONMENT_ID=your_environment_id
 PORT=3058
 ```
 
-## How the application was developed
+## How the app was build
 
-The browser collects inputs; the Node host validates requests; the lesson implementation produces observable evidence. The architecture page walks through the real source with numbered steps, prerequisite configuration, source filenames and code excerpts.
+### 1. Keep each release check explicit
 
-### Lesson implementation
+Type checking, offline tests, locked build and adapter smoke are separate supplied observations. An unrun smoke is not a successful smoke.
 
-[src/lesson.ts](https://github.com/luiscoco/Udemy-claude-managed-agents-lesson-c58-app/blob/main/src/lesson.ts)
+Source: [src/lesson.ts](src/lesson.ts#L13)
 
 ```typescript
-  async run(input) {
-
-const checks={typecheck:flag(input,"typecheck"),offline:flag(input,"offlineTests"),lockedBuild:flag(input,"lockedBuild"),adapterSmoke:text(input,"smoke")};
-const releaseAllowed=checks.typecheck&&checks.offline&&checks.lockedBuild&&checks.adapterSmoke==="passed";
-return report(releaseAllowed?"passed":"rejected",releaseAllowed?"The declared local release gate was satisfied":"A required check failed or was not run",{releaseAllowed,checks,artifactHash:hash("reviewed-demo-build"),deployed:false},["Compile actual adapter contracts","Run authored host scenarios","Bind checks to the locked build artifact","Require a separate live adapter smoke when policy requires it"]);
-
-  }
+const checks = {
+  typecheck: flag(input, "typecheck"),
+  offline: flag(input, "offlineTests"),
+  lockedBuild: flag(input, "lockedBuild"),
+  adapterSmoke: text(input, "smoke"),
 };
 ```
 
-Read the architecture page for the remaining source excerpts and explanations, including input handling and optional provider behavior. The diagram describes this application, rather than implying that an external integration has been implemented.
+### 2. Require the complete release gate
+
+Every required check must pass, including the exact passed smoke label. The evidence is bound to a seeded artifact hash and deployed:false; the sample evaluates release inputs without building or deploying an artifact.
+
+Source: [src/lesson.ts](src/lesson.ts#L14) · selected statements
+
+```typescript
+const releaseAllowed =
+  checks.typecheck &&
+  checks.offline &&
+  checks.lockedBuild &&
+  checks.adapterSmoke === "passed";
+
+return report(
+  releaseAllowed ? "passed" : "rejected",
+  releaseAllowed
+    ? "The declared local release gate was satisfied"
+    : "A required check failed or was not run",
+  {
+    releaseAllowed,
+    checks,
+    artifactHash: hash("reviewed-demo-build"),
+    deployed: false,
+  },
+  [
+    "Compile actual adapter contracts",
+    "Run authored host scenarios",
+    "Bind checks to the locked build artifact",
+    "Require a separate live adapter smoke when policy requires it",
+  ],
+);
+```
+
+### Check your understanding
+
+Run **Pass the required release checks** in the application. Compare the result with these scenario expectations:
+
+```json
+{
+  "input": {
+    "typecheck": true,
+    "offlineTests": true,
+    "lockedBuild": true,
+    "smoke": "passed"
+  },
+  "expectedOutcome": "passed",
+  "checkEvidence": {
+    "releaseAllowed": true
+  }
+}
+```
+
+Then try **Block an unrun adapter smoke**. Its expected outcome is `rejected`; identify the condition or evidence field that explains the difference.
 
 ## Validation
 
