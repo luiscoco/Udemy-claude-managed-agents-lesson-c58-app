@@ -1,0 +1,29 @@
+{
+  "source": "live-provider-commentary",
+  "sessionId": "sesn_01LVsMdKnEXWirUE44sxt4Zp",
+  "answer": "This is a local teaching experiment tied to the lesson \"Shipping: CI, Providers and SDK Upgrades,\" where a declared release gate was evaluated entirely offline against a locked build artifact. The checks performed included typechecking, an offline build verification, and an adapter smoke test \u2014 all of which passed \u2014 but no actual deployment occurred. It illustrates the structure of a local release gate (compile, run host scenarios, bind checks to an artifact, and require a live smoke test when policy demands one) without representing any real remote integration or deployed system.",
+  "stopReason": "end_turn",
+  "eventTypes": [
+    "session.status_running",
+    "session.thread_status_running",
+    "user.message",
+    "span.model_request_start",
+    "agent.thinking",
+    "agent.message",
+    "span.model_request_end",
+    "session.thread_status_idle",
+    "session.usage",
+    "session.status_idle"
+  ],
+  "requestUsage": [
+    {
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 0,
+      "input_tokens": 658,
+      "output_tokens": 149,
+      "speed": "standard"
+    }
+  ],
+  "experimentHash": "9b26a72370ca222aa4a77b36ce0b784765f22a5e5e5ce2f11fc5c6b194fba46a",
+  "scope": "A real text-only model response about the local experiment. External integrations and the experiment's correctness are not certified by this response."
+}

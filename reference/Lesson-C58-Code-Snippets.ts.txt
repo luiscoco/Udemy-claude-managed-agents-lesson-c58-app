@@ -1,0 +1,56 @@
+// SDK upgrade contract probe plus authored host-policy check. No live call on import.
+import { z } from "zod";
+import type Anthropic from "@anthropic-ai/sdk";
+import type { BetaManagedAgentsSessionEvent as Event, EventSendParams } from "@anthropic-ai/sdk/resources/beta/sessions/events";
+export const fixture = [
+  { id: "sevt_fixture_call", type: "agent.custom_tool_use", name: "lookup_fixture", input: { id: 1 },
+    processed_at: "2026-01-01T00:00:00Z" },
+  { id: "sevt_fixture_idle", type: "session.status_idle", stop_reason: { type: "requires_action", event_ids: ["sevt_fixture_call"] },
+    stop_details: null, processed_at: "2026-01-01T00:00:01Z" }
+] satisfies Event[];
+const Input = z.strictObject({ id: z.literal(1) });
+export interface SendPort { send(sessionId: string, body: EventSendParams): Promise<void> }
+export function sdkSendPort(client: Anthropic): SendPort {
+  return { send: async (sessionId, body) => {
+    await client.beta.sessions.events.send(sessionId, body, { maxRetries: 0, timeout: 10000 });
+  } };
+}
+export async function probe(port: SendPort, events: readonly Event[] = fixture) {
+  const pending = new Map<string, { id: 1 }>();
+  let observedPause = false, answerSent = false;
+  for (const event of events) {
+    if (event.type === "agent.custom_tool_use") {
+      if (event.name !== "lookup_fixture") throw new Error("Unknown fixture tool");
+      const input = Input.parse(event.input);
+      if (pending.has(event.id)) throw new Error("Duplicate call requires reconciliation");
+      pending.set(event.id, input);
+    }
+    if (event.type === "session.status_idle" && event.stop_reason.type === "requires_action") {
+      if (event.stop_reason.event_ids.length !== 1 || !pending.has(event.stop_reason.event_ids[0]))
+        throw new Error("Uncorrelated blocking event");
+      observedPause = true;
+    }
+  }
+  if (!observedPause || pending.size !== 1) throw new Error("Incomplete compatibility scenario");
+  const [eventId] = pending.keys();
+  const body = { events: [{ type: "user.custom_tool_result", custom_tool_use_id: eventId,
+    content: [{ type: "text", text: JSON.stringify({ id: 1, label: "Authored fixture record" }) }] }]
+  } satisfies EventSendParams;
+  await port.send("fixture-session", body); answerSent = true;
+  return { source: "authored-fixture", observedPause, answerSent,
+    remoteResume: "not_observed", compatibility: "compiled contract + fixture path only" };
+}
+export function releaseGate(evidence: { typecheck: boolean; offline: boolean; lockedBuild: boolean;
+  requiredAdapterSmoke: boolean; adapterSmoke: "passed" | "failed" | "not_run" }) {
+  return evidence.typecheck && evidence.offline && evidence.lockedBuild &&
+    (!evidence.requiredAdapterSmoke || evidence.adapterSmoke === "passed");
+}
+// CI: clean lockfile install -> typecheck contract probes -> authored host tests
+// -> reproducible build artifact. Use a separate authorized staging adapter smoke
+// test when required; preserve its source and artifact/version binding.
+// Fixture objects alone do not execute SDK serialization or prove service behavior.
+// A newer/patch SDK version is not inherently compatible; compare release notes,
+// actual event/send unions, cancellation, stream-first order and permission behavior.
+// Other provider/host adapters need an explicit capability matrix; do not infer
+// Managed Agents support from a similarly named model or an installed generic SDK.
+// Sending a tool result is not proof that the remote session resumed or completed.
